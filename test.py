@@ -1,14 +1,13 @@
-  return forward_call(*input, **kwargs)
-  File "/mnt/diskb/penglong/dx/code/SR/Network.py", line 1130, in forward
-    burst_feat = self.conv1(burst)
-  File "/mnt/diskb/penglong/anaconda3/envs/dx9826/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1190, in _call_impl
-    return forward_call(*input, **kwargs)
-  File "/mnt/diskb/penglong/anaconda3/envs/dx9826/lib/python3.9/site-packages/torch/nn/modules/container.py", line 204, in forward
-    input = module(input)
-  File "/mnt/diskb/penglong/anaconda3/envs/dx9826/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1190, in _call_impl
-    return forward_call(*input, **kwargs)
-  File "/mnt/diskb/penglong/anaconda3/envs/dx9826/lib/python3.9/site-packages/torch/nn/modules/conv.py", line 463, in forward
-    return self._conv_forward(input, self.weight, self.bias)
-  File "/mnt/diskb/penglong/anaconda3/envs/dx9826/lib/python3.9/site-packages/torch/nn/modules/conv.py", line 459, in _conv_forward
-    return F.conv2d(input, weight, bias, self.stride,
-RuntimeError: Input type (torch.cuda.FloatTensor) and weight type (torch.FloatTensor) should be the same
+    File "/mnt/diskb/penglong/anaconda3/envs/war/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1050, in cuda
+    return self._apply(lambda t: t.cuda(device))
+  File "/mnt/diskb/penglong/anaconda3/envs/war/lib/python3.9/site-packages/torch/nn/modules/module.py", line 900, in _apply
+    module._apply(fn)
+  File "/mnt/diskb/penglong/anaconda3/envs/war/lib/python3.9/site-packages/torch/nn/modules/module.py", line 900, in _apply
+    module._apply(fn)
+  File "/mnt/diskb/penglong/anaconda3/envs/war/lib/python3.9/site-packages/torch/nn/modules/module.py", line 927, in _apply
+    param_applied = fn(param)
+  File "/mnt/diskb/penglong/anaconda3/envs/war/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1050, in <lambda>
+    return self._apply(lambda t: t.cuda(device))
+  File "/mnt/diskb/penglong/anaconda3/envs/war/lib/python3.9/site-packages/torch/cuda/__init__.py", line 319, in _lazy_init
+    torch._C._cuda_init()
+RuntimeError: The NVIDIA driver on your system is too old (found version 11020). Please update your GPU driver by downloading and installing a new version from the URL: http://www.nvidia.com/Download/index.aspx Alternatively, go to: https://pytorch.org to install a PyTorch version that has been compiled with your version of the CUDA driver.
