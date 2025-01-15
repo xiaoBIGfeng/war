@@ -1,6 +1,6 @@
 import os
 import shutil
-from tqdm import tqdm  # 用于显示进度条
+from tqdm import tqdm  # 进度条
 
 
 def extract_top_k_scenes(txt_file, parent_folder, output_folder, k=5):
@@ -27,7 +27,7 @@ def extract_top_k_scenes(txt_file, parent_folder, output_folder, k=5):
         if line.strip():  # 跳过空行
             parts = line.split("with score")
             if len(parts) == 2:
-                scene_info = parts[0].strip()  # 例如 "1. 99_r7989.png"
+                scene_info = parts[0].strip()  # 例如 "1. img_name"
                 score = float(parts[1].strip())
 
                 # 提取索引和文件名
@@ -40,47 +40,45 @@ def extract_top_k_scenes(txt_file, parent_folder, output_folder, k=5):
     scenes = sorted(scenes, key=lambda x: x[2], reverse=True)  # 按分数降序排序
     top_k_scenes = scenes[:k]
 
-    # 提取索引
-    scene_indices = [scene[0] for scene in top_k_scenes]  # 提取索引
-
     # 创建输出文件夹
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
 
-    # 遍历每个索引并提取图片
+    # 遍历每个 Top K 场景并提取图片
     gt_folder = os.path.join(parent_folder, "GT")
     method_folders = [f for f in os.listdir(parent_folder) if os.path.isdir(os.path.join(parent_folder, f)) and f != "GT"]
 
-    for i, index in enumerate(tqdm(scene_indices, desc="Extracting scenes")):
-        # 创建单独的文件夹（按索引命名）
-        scene_output_folder = os.path.join(output_folder, str(index))
+    for scene in tqdm(top_k_scenes, desc="Extracting top-k scenes"):
+        scene_index, scene_name, _ = scene
+
+        # 创建单独的文件夹（以场景名命名）
+        scene_output_folder = os.path.join(output_folder, f"{scene_index}_{scene_name}")
         if not os.path.exists(scene_output_folder):
             os.makedirs(scene_output_folder)
 
         # 提取 GT 图片
-        extract_image_for_scene(gt_folder, index, scene_output_folder, "_GT")
+        extract_image_by_name(gt_folder, scene_name, scene_output_folder, "_GT")
 
         # 提取方法文件夹中的图片
         for method_folder in method_folders:
             method_folder_path = os.path.join(parent_folder, method_folder)
-            extract_image_for_scene(method_folder_path, index, scene_output_folder, f"_{method_folder}")
+            extract_image_by_name(method_folder_path, scene_name, scene_output_folder, f"_{method_folder}")
 
 
-def extract_image_for_scene(folder, index, output_folder, suffix):
+def extract_image_by_name(folder, scene_name, output_folder, suffix):
     """
-    从指定文件夹中提取某一索引的图片，保存到目标文件夹，并在文件名后加上后缀
+    从指定文件夹中提取某一文件名匹配的图片，保存到目标文件夹，并在文件名后加上后缀
     """
-    # 获取文件夹中的图片，按文件名排序
-    images = sorted(os.listdir(folder))
-
-    # 提取对应索引的图片
-    if index - 1 < len(images):  # 索引是从 1 开始的，所以需要减 1
-        src_path = os.path.join(folder, images[index - 1])
-        # 在文件名后添加后缀
-        name, ext = os.path.splitext(images[index - 1])
-        dst_name = f"{name}{suffix}{ext}"
-        dst_path = os.path.join(output_folder, dst_name)
-        shutil.copy(src_path, dst_path)  # 复制图片到目标文件夹
+    # 遍历文件夹中的图片，寻找匹配的文件名
+    for image in os.listdir(folder):
+        if scene_name in image:  # 确保文件名中包含场景名
+            src_path = os.path.join(folder, image)
+            # 在文件名后添加后缀
+            name, ext = os.path.splitext(image)
+            dst_name = f"{name}{suffix}{ext}"
+            dst_path = os.path.join(output_folder, dst_name)
+            shutil.copy(src_path, dst_path)  # 复制图片到目标文件夹
+            return  # 一旦找到匹配图片，立即返回
 
 
 if __name__ == "__main__":
