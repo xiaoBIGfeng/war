@@ -1,5 +1,6 @@
 import os
 import shutil
+from tqdm import tqdm  # 用于显示进度条
 
 
 def extract_top_k_scenes(txt_file, parent_folder, output_folder, k=5):
@@ -46,42 +47,40 @@ def extract_top_k_scenes(txt_file, parent_folder, output_folder, k=5):
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
 
-    # 遍历 GT 和方法文件夹，提取对应图片
+    # 遍历每个索引并提取图片
     gt_folder = os.path.join(parent_folder, "GT")
     method_folders = [f for f in os.listdir(parent_folder) if os.path.isdir(os.path.join(parent_folder, f)) and f != "GT"]
 
-    # 提取 GT 图片
-    extract_images_from_folder(gt_folder, scene_indices, os.path.join(output_folder, "GT"), "_GT")
+    for i, index in enumerate(tqdm(scene_indices, desc="Extracting scenes")):
+        # 创建单独的文件夹（按索引命名）
+        scene_output_folder = os.path.join(output_folder, str(index))
+        if not os.path.exists(scene_output_folder):
+            os.makedirs(scene_output_folder)
 
-    # 提取方法文件夹中的图片
-    for method_folder in method_folders:
-        method_folder_path = os.path.join(parent_folder, method_folder)
-        output_method_folder = os.path.join(output_folder, method_folder)
-        extract_images_from_folder(method_folder_path, scene_indices, output_method_folder, f"_{method_folder}")
+        # 提取 GT 图片
+        extract_image_for_scene(gt_folder, index, scene_output_folder, "_GT")
 
-    print(f"Top {k} 场景的图片提取完成，保存到文件夹：{output_folder}")
+        # 提取方法文件夹中的图片
+        for method_folder in method_folders:
+            method_folder_path = os.path.join(parent_folder, method_folder)
+            extract_image_for_scene(method_folder_path, index, scene_output_folder, f"_{method_folder}")
 
 
-def extract_images_from_folder(folder, indices, output_folder, suffix):
+def extract_image_for_scene(folder, index, output_folder, suffix):
     """
-    从指定文件夹中提取对应索引的图片，保存到目标文件夹，并在文件名后加上后缀
+    从指定文件夹中提取某一索引的图片，保存到目标文件夹，并在文件名后加上后缀
     """
     # 获取文件夹中的图片，按文件名排序
     images = sorted(os.listdir(folder))
 
-    # 创建输出文件夹
-    if not os.path.exists(output_folder):
-        os.makedirs(output_folder)
-
     # 提取对应索引的图片
-    for i in indices:
-        if i - 1 < len(images):  # 索引是从 1 开始的，所以需要减 1
-            src_path = os.path.join(folder, images[i - 1])
-            # 在文件名后添加后缀
-            name, ext = os.path.splitext(images[i - 1])
-            dst_name = f"{name}{suffix}{ext}"
-            dst_path = os.path.join(output_folder, dst_name)
-            shutil.copy(src_path, dst_path)  # 复制图片到目标文件夹
+    if index - 1 < len(images):  # 索引是从 1 开始的，所以需要减 1
+        src_path = os.path.join(folder, images[index - 1])
+        # 在文件名后添加后缀
+        name, ext = os.path.splitext(images[index - 1])
+        dst_name = f"{name}{suffix}{ext}"
+        dst_path = os.path.join(output_folder, dst_name)
+        shutil.copy(src_path, dst_path)  # 复制图片到目标文件夹
 
 
 if __name__ == "__main__":
