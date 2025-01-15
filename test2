@@ -1,32 +1,83 @@
 import os
+import cv2
+from skimage.metrics import structural_similarity as ssim
 import shutil
 
-# 定义源文件夹路径和目标文件夹路径
-source_gt = "/path_to/GT"
-source_lr = "/path_to/LR"
-destination_gt = "/path_to/destination/gt"
-destination_lr = "/path_to/destination/lr"
 
-# 确保目标文件夹存在，如果不存在则创建
-os.makedirs(destination_gt, exist_ok=True)
-os.makedirs(destination_lr, exist_ok=True)
+def read_images(folder_path):
+    """
+    读取文件夹中的所有图片，返回图片字典：{文件名: 图像数据}
+    """
+    images = {}
+    for file_name in os.listdir(folder_path):
+        file_path = os.path.join(folder_path, file_name)
+        if os.path.isfile(file_path) and file_name.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp')):
+            image = cv2.imread(file_path, cv2.IMREAD_GRAYSCALE)  # 读取为灰度图
+            if image is not None:
+                images[file_name] = image
+    return images
 
-# 获取源文件夹中文件名列表，并排序（确保按顺序处理前 50 张图片）
-gt_files = sorted(os.listdir(source_gt))[:50]  # 获取前 50 张图片
-lr_files = sorted(os.listdir(source_lr))[:50]  # 获取前 50 张图片
 
-# 移动 GT 文件夹中的前 50 张图片
-for file_name in gt_files:
-    src_path = os.path.join(source_gt, file_name)
-    dest_path = os.path.join(destination_gt, file_name)
-    shutil.move(src_path, dest_path)  # 移动文件
-    print(f"Moved {src_path} to {dest_path}")
+def compute_ssim(image1, image2):
+    """
+    计算两张图片的 SSIM
+    """
+    score, _ = ssim(image1, image2, full=True)
+    return score
 
-# 移动 LR 文件夹中的前 50 张图片
-for file_name in lr_files:
-    src_path = os.path.join(source_lr, file_name)
-    dest_path = os.path.join(destination_lr, file_name)
-    shutil.move(src_path, dest_path)  # 移动文件
-    print(f"Moved {src_path} to {dest_path}")
 
-print("File transfer complete.")
+def find_and_rename_images(folder_a, folder_b, threshold=0.8, output_mapping_file="mapping.txt"):
+    """
+    实现文件夹 A 和 B 中图片的匹配与重命名，记录映射关系
+    """
+    # 读取两个文件夹的图片
+    images_a = read_images(folder_a)
+    images_b = read_images(folder_b)
+
+    # 映射关系存储
+    mapping = []
+
+    # 遍历文件夹 A 的图片
+    for file_name_a, image_a in images_a.items():
+        best_match_file = None
+        best_match_ssim = 0
+
+        # 遍历文件夹 B 的图片
+        for file_name_b, image_b in images_b.items():
+            # 确保两张图片大小一致才能计算 SSIM
+            if image_a.shape == image_b.shape:
+                score = compute_ssim(image_a, image_b)
+                if score > best_match_ssim:
+                    best_match_ssim = score
+                    best_match_file = file_name_b
+
+        # 如果找到匹配且 SSIM 超过阈值
+        if best_match_file and best_match_ssim >= threshold:
+            # 重命名文件夹 B 中的图片
+            old_path_b = os.path.join(folder_b, best_match_file)
+            new_path_b = os.path.join(folder_b, file_name_a)
+            os.rename(old_path_b, new_path_b)
+
+            # 记录映射关系
+            mapping.append(f"{file_name_a} -> {best_match_file} (SSIM: {best_match_ssim:.4f})")
+            print(f"Matched: {file_name_a} -> {best_match_file} (SSIM: {best_match_ssim:.4f})")
+
+            # 删除已匹配的图片，避免重复匹配
+            del images_b[best_match_file]
+
+    # 将映射关系写入文件
+    with open(output_mapping_file, "w") as f:
+        f.write("\n".join(mapping))
+    print(f"Mapping saved to {output_mapping_file}")
+
+
+if __name__ == "__main__":
+    # 文件夹路径
+    folder_a = "path/to/folder_A"  # 替换为文件夹 A 的路径
+    folder_b = "path/to/folder_B"  # 替换为文件夹 B 的路径
+
+    # 阈值设置（可以根据需求调整）
+    ssim_threshold = 0.8
+
+    # 执行匹配与重命名
+    find_and_rename_images(folder_a, folder_b, threshold=ssim_threshold)
