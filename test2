@@ -26,8 +26,15 @@ def process_images(parent_folder, output_file="psnr_results.txt"):
 
     method_folders = [f for f in os.listdir(parent_folder) if os.path.isdir(os.path.join(parent_folder, f)) and f != "GT"]
 
-    # 获取 GT 文件夹中的图片文件名（假定所有文件夹图片顺序和命名一致）
+    # 获取 GT 文件夹中的图片文件名并按顺序排序
     gt_images = sorted(os.listdir(gt_folder))
+    gt_images_paths = [os.path.join(gt_folder, img) for img in gt_images]
+
+    # 确保每个方法文件夹的图片数量与 GT 一致
+    for method_folder in method_folders:
+        method_images = sorted(os.listdir(os.path.join(parent_folder, method_folder)))
+        if len(method_images) != len(gt_images):
+            raise ValueError(f"方法文件夹 {method_folder} 中图片数量与 GT 文件夹不一致")
 
     # 写入结果文件
     with open(output_file, "w") as f:
@@ -36,8 +43,8 @@ def process_images(parent_folder, output_file="psnr_results.txt"):
         f.write(header)
 
         # 遍历 GT 文件夹中的每张图片
-        for gt_image_name in gt_images:
-            gt_image_path = os.path.join(gt_folder, gt_image_name)
+        for i, gt_image_path in enumerate(gt_images_paths):
+            gt_image_name = os.path.basename(gt_image_path)
 
             # 读取 GT 图片
             gt_image = cv2.imread(gt_image_path, cv2.IMREAD_GRAYSCALE)
@@ -50,9 +57,13 @@ def process_images(parent_folder, output_file="psnr_results.txt"):
 
             # 遍历每个方法文件夹
             for method_folder in method_folders:
-                method_image_path = os.path.join(parent_folder, method_folder, gt_image_name)
+                method_folder_path = os.path.join(parent_folder, method_folder)
+                method_images = sorted(os.listdir(method_folder_path))
 
-                # 读取方法文件夹中的对应图片
+                # 根据顺序读取方法文件夹中的对应图片
+                method_image_path = os.path.join(method_folder_path, method_images[i])
+
+                # 读取方法图片
                 method_image = cv2.imread(method_image_path, cv2.IMREAD_GRAYSCALE)
                 if method_image is None:
                     print(f"无法读取方法图片：{method_image_path}")
