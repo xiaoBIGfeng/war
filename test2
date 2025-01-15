@@ -16,7 +16,7 @@ def calculate_psnr(img1, img2):
     return psnr
 
 
-def process_images(parent_folder, output_file="psnr_results.txt", top_k=5):
+def process_images(parent_folder, output_file="psnr_results.txt"):
     """
     计算每个方法文件夹的图片与 GT 文件夹中对应图片的 PSNR，并记录到文件
     """
@@ -63,6 +63,7 @@ def process_images(parent_folder, output_file="psnr_results.txt", top_k=5):
             row = [gt_image_name.ljust(name_width)]
             ours_psnr = None
             total_other_psnr = 0
+            other_methods_count = len(method_folders) - 1  # 其他方法的数量
 
             # 遍历每个方法文件夹
             for method_folder in method_folders:
@@ -92,7 +93,8 @@ def process_images(parent_folder, output_file="psnr_results.txt", top_k=5):
 
             # 计算 ours 方法的优势分数（如果存在 ours 方法）
             if ours_psnr is not None:
-                advantage_score = ours_psnr * len(method_folders) - total_other_psnr
+                # 修正优势分数公式：乘以其他方法的数量
+                advantage_score = ours_psnr * other_methods_count - total_other_psnr
                 ours_advantage_scores.append((gt_image_name, advantage_score))
 
             # 写入当前行到文件
@@ -107,8 +109,8 @@ def process_images(parent_folder, output_file="psnr_results.txt", top_k=5):
         # 找出 ours 方法最占优的场景，并排序
         if ours_advantage_scores:
             ours_advantage_scores.sort(key=lambda x: x[1], reverse=True)  # 按优势分数从高到低排序
-            f.write(f"\nOurs most advantageous scenes (top {top_k}):\n")
-            for i, (image_name, score) in enumerate(ours_advantage_scores[:top_k]):
+            f.write(f"\nOurs most advantageous scenes (all):\n")
+            for i, (image_name, score) in enumerate(ours_advantage_scores):
                 f.write(f"{i + 1}. {image_name} with score {score:.2f}\n")
 
     print(f"PSNR 计算完成，结果已保存到：{output_file}")
@@ -119,5 +121,5 @@ if __name__ == "__main__":
     parent_folder_path = "path/to/parent_folder"  # 替换为父文件夹路径
     output_file_path = "psnr_results.txt"  # 输出文件名，可自定义
 
-    # 执行 PSNR 计算，输出最占优的前 5 个场景
-    process_images(parent_folder_path, output_file_path, top_k=5)
+    # 执行 PSNR 计算，输出所有场景
+    process_images(parent_folder_path, output_file_path)
