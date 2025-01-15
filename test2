@@ -1,125 +1,87 @@
 import os
-import cv2
-import numpy as np
-from tqdm import tqdm  # 用于显示进度条
+import shutil
 
 
-def calculate_psnr(img1, img2):
+def extract_top_k_scenes(txt_file, parent_folder, output_folder, k=5):
     """
-    计算两张图片的 PSNR
+    根据 txt 文件中 'Ours most advantageous scene' 数据，提取 Top K 场景的图片
     """
-    mse = np.mean((img1 - img2) ** 2)
-    if mse == 0:  # 完全相同的图片
-        return float('inf')
-    max_pixel = 255.0  # 假定图像像素范围为 [0, 255]
-    psnr = 10 * np.log10((max_pixel ** 2) / mse)
-    return psnr
+    # 读取 txt 文件
+    with open(txt_file, "r") as f:
+        lines = f.readlines()
 
+    # 找到 "Ours most advantageous scene" 部分
+    start_line = None
+    for i, line in enumerate(lines):
+        if "Ours most advantageous scene:" in line:
+            start_line = i + 1  # 数据从下一行开始
+            break
 
-def process_images(parent_folder, output_file="psnr_results.txt"):
-    """
-    计算每个方法文件夹的图片与 GT 文件夹中对应图片的 PSNR，并记录到文件
-    """
-    # 定位 GT 文件夹和其他方法文件夹
+    if start_line is None:
+        raise ValueError("未找到 'Ours most advantageous scene' 部分")
+
+    # 提取场景数据
+    scenes = []
+    for line in lines[start_line:]:
+        if line.strip():  # 跳过空行
+            parts = line.split("with score")
+            if len(parts) == 2:
+                scene_name = parts[0].strip()
+                score = float(parts[1].strip())
+                scenes.append((scene_name, score))
+
+    # 按分数排序并获取 Top K 场景
+    scenes = sorted(scenes, key=lambda x: x[1], reverse=True)  # 按分数降序排序
+    top_k_scenes = scenes[:k]
+
+    # 提取索引
+    scene_indices = [int(scene[0].split("_")[0]) for scene in top_k_scenes]  # 提取索引
+
+    # 创建输出文件夹
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
+
+    # 遍历 GT 和方法文件夹，提取对应图片
     gt_folder = os.path.join(parent_folder, "GT")
-    if not os.path.exists(gt_folder):
-        raise FileNotFoundError(f"GT 文件夹未找到：{gt_folder}")
-
     method_folders = [f for f in os.listdir(parent_folder) if os.path.isdir(os.path.join(parent_folder, f)) and f != "GT"]
 
-    # 获取 GT 文件夹中的图片文件名并按顺序排序
-    gt_images = sorted(os.listdir(gt_folder))
-    gt_images_paths = [os.path.join(gt_folder, img) for img in gt_images]
+    # 提取 GT 图片
+    extract_images_from_folder(gt_folder, scene_indices, os.path.join(output_folder, "GT"))
 
-    # 确保每个方法文件夹的图片数量与 GT 一致
+    # 提取方法文件夹中的图片
     for method_folder in method_folders:
-        method_images = sorted(os.listdir(os.path.join(parent_folder, method_folder)))
-        if len(method_images) != len(gt_images):
-            raise ValueError(f"方法文件夹 {method_folder} 中图片数量与 GT 文件夹不一致")
+        method_folder_path = os.path.join(parent_folder, method_folder)
+        output_method_folder = os.path.join(output_folder, method_folder)
+        extract_images_from_folder(method_folder_path, scene_indices, output_method_folder)
 
-    # 初始化数据存储
-    results = []  # 存储每张图片的 PSNR 结果
-    method_psnr_sums = {method: 0 for method in method_folders}  # 用于计算平均 PSNR
-    ours_advantage_scores = []  # 用于记录 ours 方法的优势分数
+    print(f"Top {k} 场景的图片提取完成，保存到文件夹：{output_folder}")
 
-    # 写入结果文件
-    with open(output_file, "w") as f:
-        # 写入表头
-        name_width = 20  # 固定 name 列宽度
-        header = f"{'name'.ljust(name_width)}" + "\t".join(method_folders) + "\n"
-        f.write(header)
 
-        # 遍历 GT 文件夹中的每张图片（显示进度条）
-        for i, gt_image_path in enumerate(tqdm(gt_images_paths, desc="Calculating PSNR")):
-            gt_image_name = os.path.basename(gt_image_path)
+def extract_images_from_folder(folder, indices, output_folder):
+    """
+    从指定文件夹中提取对应索引的图片，保存到目标文件夹
+    """
+    # 获取文件夹中的图片，按文件名排序
+    images = sorted(os.listdir(folder))
 
-            # 读取 GT 图片
-            gt_image = cv2.imread(gt_image_path, cv2.IMREAD_GRAYSCALE)
-            if gt_image is None:
-                print(f"无法读取 GT 图片：{gt_image_path}")
-                continue
+    # 创建输出文件夹
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
 
-            # 初始化当前行的数据
-            row = [gt_image_name.ljust(name_width)]
-            ours_psnr = None
-            total_other_psnr = 0
-            other_methods_count = len(method_folders) - 1  # 其他方法的数量
-
-            # 遍历每个方法文件夹
-            for method_folder in method_folders:
-                method_folder_path = os.path.join(parent_folder, method_folder)
-                method_images = sorted(os.listdir(method_folder_path))
-
-                # 根据顺序读取方法文件夹中的对应图片
-                method_image_path = os.path.join(method_folder_path, method_images[i])
-
-                # 读取方法图片
-                method_image = cv2.imread(method_image_path, cv2.IMREAD_GRAYSCALE)
-                if method_image is None:
-                    print(f"无法读取方法图片：{method_image_path}")
-                    row.append("N/A")  # 图片缺失时记录为 "N/A"
-                    continue
-
-                # 计算 PSNR
-                psnr = calculate_psnr(gt_image, method_image)
-                row.append(f"{psnr:.2f}")  # 保留两位小数
-                method_psnr_sums[method_folder] += psnr  # 累加 PSNR
-
-                # 记录 ours 方法的 PSNR 和其他方法的总和
-                if method_folder.lower() == "ours":
-                    ours_psnr = psnr
-                else:
-                    total_other_psnr += psnr
-
-            # 计算 ours 方法的优势分数（如果存在 ours 方法）
-            if ours_psnr is not None:
-                # 修正优势分数公式：乘以其他方法的数量
-                advantage_score = ours_psnr * other_methods_count - total_other_psnr
-                ours_advantage_scores.append((gt_image_name, advantage_score))
-
-            # 写入当前行到文件
-            f.write("\t".join(row) + "\n")
-
-        # 计算并写入平均 PSNR
-        f.write("\nAverage PSNR:\n")
-        for method_folder, psnr_sum in method_psnr_sums.items():
-            average_psnr = psnr_sum / len(gt_images)
-            f.write(f"{method_folder}: {average_psnr:.2f}\n")
-
-        # 找出 ours 方法最占优的场景，并排序
-        if ours_advantage_scores:
-            ours_advantage_scores.sort(key=lambda x: x[1], reverse=True)  # 按优势分数从高到低排序
-            f.write(f"\nOurs most advantageous scenes (all):\n")
-            for i, (image_name, score) in enumerate(ours_advantage_scores):
-                f.write(f"{i + 1}. {image_name} with score {score:.2f}\n")
-
-    print(f"PSNR 计算完成，结果已保存到：{output_file}")
+    # 提取对应索引的图片
+    for i in indices:
+        if i - 1 < len(images):  # 索引是从 1 开始的，所以需要减 1
+            src_path = os.path.join(folder, images[i - 1])
+            dst_path = os.path.join(output_folder, images[i - 1])
+            shutil.copy(src_path, dst_path)  # 复制图片到目标文件夹
 
 
 if __name__ == "__main__":
-    # 父文件夹路径（替换为实际路径）
-    parent_folder_path = "path/to/parent_folder"  # 替换为父文件夹路径
-    output_file_path = "psnr_results.txt"  # 输出文件名，可自定义
+    # 输入参数
+    txt_file_path = "psnr_results.txt"  # 刚刚生成的 txt 文件路径
+    parent_folder_path = "path/to/parent_folder"  # 父文件夹路径
+    output_folder_path = "path/to/output_folder"  # 提取图片的输出文件夹
+    top_k = 5  # 提取 Top K 场景
 
-    # 执行 PSNR 计算，输出所有场景
-    process_images(parent_folder_path, output_file_path)
+    # 执行提取
+    extract_top_k_scenes(txt_file_path, parent_folder_path, output_folder_path, k=top_k)
