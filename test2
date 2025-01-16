@@ -31,13 +31,13 @@ def adjust_image_size(img, target_shape):
     # 初始化输出图像
     output_img = np.zeros((target_height, target_width), dtype=img.dtype)
 
-    # 确定填充或裁剪的范围
+    # 填充或裁剪范围
     y_min = max(0, (target_height - img_height) // 2)
     x_min = max(0, (target_width - img_width) // 2)
     y_max = y_min + min(img_height, target_height)
     x_max = x_min + min(img_width, target_width)
 
-    # 将原图像填充到目标尺寸
+    # 填充或裁剪
     output_img[y_min:y_max, x_min:x_max] = img[
         max(0, (img_height - target_height) // 2): max(0, (img_height - target_height) // 2) + min(img_height, target_height),
         max(0, (img_width - target_width) // 2): max(0, (img_width - target_width) // 2) + min(img_width, target_width)
@@ -54,7 +54,7 @@ def process_images_for_dataset(gt_folder, method_folders, output_file):
     gt_images = sorted(os.listdir(gt_folder))
     gt_images_paths = [os.path.join(gt_folder, img) for img in gt_images]
 
-    # 确保每个方法文件夹的图片数量与 GT 一致
+    # 检查每个方法文件夹是否与 GT 文件夹匹配
     for method_folder in method_folders:
         method_images = sorted(os.listdir(method_folder))
         if len(method_images) != len(gt_images):
