@@ -16,6 +16,36 @@ def calculate_psnr(img1, img2):
     return psnr
 
 
+def adjust_image_size(img, target_shape):
+    """
+    调整图像尺寸，使其与目标尺寸相同。
+    如果图像比目标小，则进行填充；如果图像比目标大，则进行裁剪。
+    """
+    target_height, target_width = target_shape
+    img_height, img_width = img.shape
+
+    # 如果图像尺寸一致，直接返回
+    if img_height == target_height and img_width == target_width:
+        return img
+
+    # 初始化输出图像
+    output_img = np.zeros((target_height, target_width), dtype=img.dtype)
+
+    # 确定填充或裁剪的范围
+    y_min = max(0, (target_height - img_height) // 2)
+    x_min = max(0, (target_width - img_width) // 2)
+    y_max = y_min + min(img_height, target_height)
+    x_max = x_min + min(img_width, target_width)
+
+    # 将原图像填充到目标尺寸
+    output_img[y_min:y_max, x_min:x_max] = img[
+        max(0, (img_height - target_height) // 2): max(0, (img_height - target_height) // 2) + min(img_height, target_height),
+        max(0, (img_width - target_width) // 2): max(0, (img_width - target_width) // 2) + min(img_width, target_width)
+    ]
+
+    return output_img
+
+
 def process_images_for_dataset(gt_folder, method_folders, output_file, top_k=5):
     """
     针对单个数据集计算 PSNR，并将结果保存到文件
@@ -68,6 +98,9 @@ def process_images_for_dataset(gt_folder, method_folders, output_file, top_k=5):
                     print(f"无法读取方法图片：{method_image_path}")
                     row.append("N/A")  # 图片缺失时记录为 "N/A"
                     continue
+
+                # 调整方法图片尺寸，使其与 GT 图片尺寸一致
+                method_image = adjust_image_size(method_image, gt_image.shape)
 
                 # 计算 PSNR
                 psnr = calculate_psnr(gt_image, method_image)
