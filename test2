@@ -1,6 +1,7 @@
 import os
 import shutil
 
+
 def parse_txt_file(txt_file, top_k):
     """
     解析单个 txt 文件，提取 Ours most advantageous scenes (all) 中的前 top-k 场景
@@ -35,10 +36,17 @@ def parse_txt_file(txt_file, top_k):
     return advantageous_scenes[:top_k]
 
 
-def copy_images(txt_files, gt_root, method_roots, output_path, top_k):
+def copy_images(parent_folder, txt_files, output_path, top_k):
     """
     根据多个 txt 文件提取前 top-k 的图片，并复制到目标文件夹
     """
+    gt_root = os.path.join(parent_folder, "GT")
+    method_roots = [
+        os.path.join(parent_folder, method)
+        for method in os.listdir(parent_folder)
+        if method != "GT" and os.path.isdir(os.path.join(parent_folder, method))
+    ]
+
     if not os.path.exists(output_path):
         os.makedirs(output_path)
 
@@ -83,19 +91,14 @@ def copy_images(txt_files, gt_root, method_roots, output_path, top_k):
 
 if __name__ == "__main__":
     # 输入参数
+    parent_folder = "/path/to/parent_folder"  # 替换为你的 parent_folder 路径
     txt_files = [
-        "/path/to/dataset1_psnr_results.txt",
-        "/path/to/dataset2_psnr_results.txt",
-        # 添加更多 txt 文件路径
-    ]
-    gt_root = "/path/to/GT"  # GT 文件夹的根路径
-    method_roots = [
-        "/path/to/method-1",  # 方法 1 的根路径
-        "/path/to/method-2",  # 方法 2 的根路径
-        "/path/to/ours",      # 我们的方法的根路径
-    ]
+        os.path.join(parent_folder, f)
+        for f in os.listdir(parent_folder)
+        if f.endswith("_psnr_results.txt")
+    ]  # 自动获取所有 txt 文件
     output_path = "/path/to/output"  # 输出文件夹路径
     top_k = 5  # 提取前 top-k 的场景
 
     # 执行图片提取
-    copy_images(txt_files, gt_root, method_roots, output_path, top_k)
+    copy_images(parent_folder, txt_files, output_path, top_k)
