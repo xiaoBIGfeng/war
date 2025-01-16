@@ -107,8 +107,8 @@ def process_images_for_dataset(dataset_folder, output_file, top_k=5):
         # 找出 ours 方法最占优的场景，并排序
         if ours_advantage_scores:
             ours_advantage_scores.sort(key=lambda x: x[1], reverse=True)  # 按优势分数从高到低排序
-            f.write(f"\nOurs most advantageous scenes (top {top_k}):\n")
-            for i, (image_name, score) in enumerate(ours_advantage_scores[:top_k]):
+            f.write(f"\nOurs most advantageous scenes (sorted by score):\n")
+            for i, (image_name, score) in enumerate(ours_advantage_scores):
                 f.write(f"{i + 1}. {image_name} with score {score:.2f}\n")
 
     print(f"PSNR 计算完成，结果已保存到：{output_file}")
