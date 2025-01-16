@@ -77,7 +77,16 @@ def copy_images(parent_folder, txt_files, output_path, top_k):
             # 遍历方法文件夹，复制对应的方法图片
             for method_root in method_roots:
                 method_name = os.path.basename(method_root)  # 提取方法名称
-                method_file = os.path.join(method_root, dataset_name, name)  # 方法图片路径
+
+                # 获取方法图片列表
+                method_folder = os.path.join(method_root, dataset_name)
+                method_images = sorted(os.listdir(method_folder))  # 按文件名排序
+                if index - 1 < 0 or index - 1 >= len(method_images):
+                    print(f"Index 超出范围：方法 {method_name}，数据集 {dataset_name}，索引 {index}")
+                    continue
+
+                # 找到第 index-1 个图片
+                method_file = os.path.join(method_folder, method_images[index - 1])
                 if not os.path.exists(method_file):
                     print(f"方法文件不存在: {method_file}")
                     continue
