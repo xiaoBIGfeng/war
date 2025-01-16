@@ -16,29 +16,21 @@ def calculate_psnr(img1, img2):
     return psnr
 
 
-def process_images_for_dataset(dataset_folder, output_file, top_k=5):
+def process_images_for_dataset(gt_folder, method_folders, output_file, top_k=5):
     """
-    计算每个方法文件夹的图片与 GT 文件夹中对应图片的 PSNR，并记录到对应数据集的文件
+    针对单个数据集计算 PSNR，并将结果保存到文件
     """
-    # 定位 GT 文件夹和其他方法文件夹
-    gt_folder = os.path.join(dataset_folder, "GT")
-    if not os.path.exists(gt_folder):
-        raise FileNotFoundError(f"GT 文件夹未找到：{gt_folder}")
-
-    method_folders = [f for f in os.listdir(dataset_folder) if os.path.isdir(os.path.join(dataset_folder, f)) and f != "GT"]
-
     # 获取 GT 文件夹中的图片文件名并按顺序排序
     gt_images = sorted(os.listdir(gt_folder))
     gt_images_paths = [os.path.join(gt_folder, img) for img in gt_images]
 
     # 确保每个方法文件夹的图片数量与 GT 一致
     for method_folder in method_folders:
-        method_images = sorted(os.listdir(os.path.join(dataset_folder, method_folder)))
+        method_images = sorted(os.listdir(method_folder))
         if len(method_images) != len(gt_images):
             raise ValueError(f"方法文件夹 {method_folder} 中图片数量与 GT 文件夹不一致")
 
     # 初始化数据存储
-    results = []  # 存储每张图片的 PSNR 结果
     method_psnr_sums = {method: 0 for method in method_folders}  # 用于计算平均 PSNR
     ours_advantage_scores = []  # 用于记录 ours 方法的优势分数
 
@@ -46,11 +38,12 @@ def process_images_for_dataset(dataset_folder, output_file, top_k=5):
     with open(output_file, "w") as f:
         # 写入表头
         name_width = 20  # 固定 name 列宽度
-        header = f"{'name'.ljust(name_width)}" + "\t".join(method_folders) + "\n"
+        method_names = [os.path.basename(method) for method in method_folders]
+        header = f"{'name'.ljust(name_width)}" + "\t".join(method_names) + "\n"
         f.write(header)
 
         # 遍历 GT 文件夹中的每张图片（显示进度条）
-        for i, gt_image_path in enumerate(tqdm(gt_images_paths, desc=f"Calculating PSNR for {os.path.basename(dataset_folder)}")):
+        for i, gt_image_path in enumerate(tqdm(gt_images_paths, desc=f"Calculating PSNR for {os.path.basename(gt_folder)}")):
             gt_image_name = os.path.basename(gt_image_path)
 
             # 读取 GT 图片
@@ -66,11 +59,8 @@ def process_images_for_dataset(dataset_folder, output_file, top_k=5):
 
             # 遍历每个方法文件夹
             for method_folder in method_folders:
-                method_folder_path = os.path.join(dataset_folder, method_folder)
-                method_images = sorted(os.listdir(method_folder_path))
-
-                # 根据顺序读取方法文件夹中的对应图片
-                method_image_path = os.path.join(method_folder_path, method_images[i])
+                method_images = sorted(os.listdir(method_folder))
+                method_image_path = os.path.join(method_folder, method_images[i])
 
                 # 读取方法图片
                 method_image = cv2.imread(method_image_path, cv2.IMREAD_GRAYSCALE)
@@ -85,7 +75,7 @@ def process_images_for_dataset(dataset_folder, output_file, top_k=5):
                 method_psnr_sums[method_folder] += psnr  # 累加 PSNR
 
                 # 记录 ours 方法的 PSNR 和其他方法的总和
-                if method_folder.lower() == "ours":
+                if os.path.basename(method_folder).lower() == "ours":
                     ours_psnr = psnr
                 else:
                     total_other_psnr += psnr
@@ -102,9 +92,9 @@ def process_images_for_dataset(dataset_folder, output_file, top_k=5):
         f.write("\nAverage PSNR:\n")
         for method_folder, psnr_sum in method_psnr_sums.items():
             average_psnr = psnr_sum / len(gt_images)
-            f.write(f"{method_folder}: {average_psnr:.2f}\n")
+            f.write(f"{os.path.basename(method_folder)}: {average_psnr:.2f}\n")
 
-        # 找出 ours 方法最占优的场景，并排序
+        # 按优势分数排序并写入
         if ours_advantage_scores:
             ours_advantage_scores.sort(key=lambda x: x[1], reverse=True)  # 按优势分数从高到低排序
             f.write(f"\nOurs most advantageous scenes (sorted by score):\n")
@@ -118,16 +108,23 @@ def process_all_datasets(parent_folder, top_k=5):
     """
     遍历所有数据集文件夹并计算 PSNR
     """
-    datasets = [f for f in os.listdir(parent_folder) if os.path.isdir(os.path.join(parent_folder, f))]
+    gt_root = os.path.join(parent_folder, "GT")
+    method_roots = [os.path.join(parent_folder, method) for method in os.listdir(parent_folder) if method != "GT" and os.path.isdir(os.path.join(parent_folder, method))]
+
+    # 遍历 GT 文件夹中的每个数据集
+    datasets = [d for d in os.listdir(gt_root) if os.path.isdir(os.path.join(gt_root, d))]
     for dataset in datasets:
-        dataset_folder = os.path.join(parent_folder, dataset)
-        if "GT" not in os.listdir(dataset_folder):  # 检查是否是有效数据集
-            print(f"跳过无效数据集文件夹：{dataset_folder}")
+        gt_folder = os.path.join(gt_root, dataset)
+        method_folders = [os.path.join(method_root, dataset) for method_root in method_roots if os.path.exists(os.path.join(method_root, dataset))]
+
+        # 检查方法文件夹是否都存在
+        if not method_folders:
+            print(f"数据集 {dataset} 缺少方法文件夹，跳过...")
             continue
 
         # 输出文件路径
         output_file = os.path.join(parent_folder, f"{dataset}_psnr_results.txt")
-        process_images_for_dataset(dataset_folder, output_file, top_k)
+        process_images_for_dataset(gt_folder, method_folders, output_file, top_k)
 
 
 if __name__ == "__main__":
