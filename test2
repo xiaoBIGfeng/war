@@ -60,15 +60,17 @@ def process_images_for_dataset(gt_folder, method_folders, output_file):
         if len(method_images) != len(gt_images):
             raise ValueError(f"方法文件夹 {method_folder} 中图片数量与 GT 文件夹不一致")
 
+    # 提取方法名称
+    method_names = [os.path.basename(os.path.dirname(method_folder)) for method_folder in method_folders]
+
     # 初始化数据存储
-    method_psnr_sums = {os.path.basename(method): 0 for method in method_folders}  # 用于计算平均 PSNR
+    method_psnr_sums = {name: 0 for name in method_names}  # 用于计算平均 PSNR
     ours_advantage_scores = []  # 用于记录 ours 方法的优势分数
 
     # 写入结果文件
     with open(output_file, "w") as f:
         # 写入表头
         name_width = 20  # 固定 name 列宽度
-        method_names = [os.path.basename(method) for method in method_folders]
         header = f"{'name'.ljust(name_width)}" + "\t".join(method_names) + "\n"
         f.write(header)
 
@@ -88,7 +90,7 @@ def process_images_for_dataset(gt_folder, method_folders, output_file):
             total_other_psnr = 0
 
             # 遍历每个方法文件夹
-            for method_folder in method_folders:
+            for method_folder, method_name in zip(method_folders, method_names):
                 method_images = sorted(os.listdir(method_folder))
                 method_image_path = os.path.join(method_folder, method_images[i])
 
@@ -105,10 +107,10 @@ def process_images_for_dataset(gt_folder, method_folders, output_file):
                 # 计算 PSNR
                 psnr = calculate_psnr(gt_image, method_image)
                 row.append(f"{psnr:.2f}")  # 保留两位小数
-                method_psnr_sums[os.path.basename(method_folder)] += psnr  # 累加 PSNR
+                method_psnr_sums[method_name] += psnr  # 累加 PSNR
 
                 # 记录 ours 方法的 PSNR 和其他方法的总和
-                if os.path.basename(method_folder).lower() == "ours":
+                if method_name.lower() == "ours":
                     ours_psnr = psnr
                 else:
                     total_other_psnr += psnr
@@ -123,9 +125,9 @@ def process_images_for_dataset(gt_folder, method_folders, output_file):
 
         # 计算并写入平均 PSNR
         f.write("\nAverage PSNR:\n")
-        for method_folder, psnr_sum in method_psnr_sums.items():
+        for method_name, psnr_sum in method_psnr_sums.items():
             average_psnr = psnr_sum / len(gt_images)
-            f.write(f"{method_folder}: {average_psnr:.2f}\n")
+            f.write(f"{method_name}: {average_psnr:.2f}\n")
 
         # 按优势分数排序并写入
         if ours_advantage_scores:
