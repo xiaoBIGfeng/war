@@ -1,10 +1,101 @@
-# 定义列宽
-column_width = 12  # 每列固定宽度
+import os
+import shutil
 
-# 修改表头，方法名称按固定列宽对齐
-header = f"{'name'.ljust(name_width)}" + "".join([method_name.ljust(column_width) for method_name in method_names]) + "\n"
-f.write(header)
+def parse_txt_file(txt_file, top_k):
+    """
+    解析单个 txt 文件，提取 Ours most advantageous scenes (all) 中的前 top-k 场景
+    """
+    with open(txt_file, "r") as f:
+        lines = f.readlines()
 
-# 修改输出每行 PSNR 值，按固定列宽对齐
-row = f"{gt_image_name.ljust(name_width)}" + "".join([psnr_str.ljust(column_width) for psnr_str in row[1:]]) + "\n"
-f.write(row)
+    # 定位 "Ours most advantageous scenes (all):" 部分
+    start_index = None
+    for i, line in enumerate(lines):
+        if line.strip().startswith("Ours most advantageous scenes (all):"):
+            start_index = i + 1
+            break
+
+    if start_index is None:
+        raise ValueError(f"未找到 'Ours most advantageous scenes (all):' 部分: {txt_file}")
+
+    # 提取前 top-k 的场景
+    advantageous_scenes = []
+    for line in lines[start_index:]:
+        if line.strip() == "":
+            break
+        parts = line.strip().split(".")  # 格式为 "1. 17_name.png with score 10"
+        if len(parts) < 2:
+            continue
+        rank, rest = parts[0], parts[1]
+        name_with_score = rest.split(" with score ")[0].strip()
+        index, name = name_with_score.split("_", 1)  # 提取排序号和文件名
+        advantageous_scenes.append((int(index), name))
+
+    # 返回前 top-k 的场景
+    return advantageous_scenes[:top_k]
+
+
+def copy_images(txt_files, gt_root, method_roots, output_path, top_k):
+    """
+    根据多个 txt 文件提取前 top-k 的图片，并复制到目标文件夹
+    """
+    if not os.path.exists(output_path):
+        os.makedirs(output_path)
+
+    for txt_file in txt_files:
+        # 获取数据集名称（假设 txt 文件名为 dataset1_psnr_results.txt）
+        dataset_name = os.path.basename(txt_file).split("_psnr_results.txt")[0]
+        dataset_output_path = os.path.join(output_path, dataset_name)
+        if not os.path.exists(dataset_output_path):
+            os.makedirs(dataset_output_path)
+
+        # 解析 txt 文件，获取前 top-k 的场景
+        top_scenes = parse_txt_file(txt_file, top_k)
+
+        print(f"Processing {dataset_name}, found top {len(top_scenes)} scenes.")
+
+        # 遍历每个场景，复制对应的图片
+        for index, name in top_scenes:
+            # 源文件路径
+            gt_file = os.path.join(gt_root, dataset_name, name)  # GT 图片路径
+            if not os.path.exists(gt_file):
+                print(f"GT 文件不存在: {gt_file}")
+                continue
+
+            # 复制 GT 图片
+            gt_target = os.path.join(dataset_output_path, f"{index}_{name}_GT.png")
+            shutil.copy(gt_file, gt_target)
+
+            # 遍历方法文件夹，复制对应的方法图片
+            for method_root in method_roots:
+                method_name = os.path.basename(method_root)  # 提取方法名称
+                method_file = os.path.join(method_root, dataset_name, name)  # 方法图片路径
+                if not os.path.exists(method_file):
+                    print(f"方法文件不存在: {method_file}")
+                    continue
+
+                # 复制方法图片
+                method_target = os.path.join(dataset_output_path, f"{index}_{name}_{method_name}.png")
+                shutil.copy(method_file, method_target)
+
+    print(f"图片提取完成，结果已保存到: {output_path}")
+
+
+if __name__ == "__main__":
+    # 输入参数
+    txt_files = [
+        "/path/to/dataset1_psnr_results.txt",
+        "/path/to/dataset2_psnr_results.txt",
+        # 添加更多 txt 文件路径
+    ]
+    gt_root = "/path/to/GT"  # GT 文件夹的根路径
+    method_roots = [
+        "/path/to/method-1",  # 方法 1 的根路径
+        "/path/to/method-2",  # 方法 2 的根路径
+        "/path/to/ours",      # 我们的方法的根路径
+    ]
+    output_path = "/path/to/output"  # 输出文件夹路径
+    top_k = 5  # 提取前 top-k 的场景
+
+    # 执行图片提取
+    copy_images(txt_files, gt_root, method_roots, output_path, top_k)
