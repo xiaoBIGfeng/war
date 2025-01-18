@@ -1,11 +1,11 @@
 import math
 import torch
 
+
 def trunc_normal_(tensor, mean=0.0, std=1.0, a=-2.0, b=2.0):
     """
     Fills the input tensor with values drawn from a truncated normal distribution.
-    The values are effectively drawn from the normal distribution with the given
-    mean and std, then values outside the range [a, b] are redrawn until they fall within the bounds.
+    This version avoids in-place operations to support backpropagation.
 
     Args:
         tensor (torch.Tensor): The tensor to fill.
@@ -16,22 +16,21 @@ def trunc_normal_(tensor, mean=0.0, std=1.0, a=-2.0, b=2.0):
     """
     # Compute the upper and lower bounds in the standard normal space
     def norm_cdf(x):
-        # Cumulative distribution function for the standard normal distribution
-        return (1.0 + math.erf(x / math.sqrt(2.0))) / 2.0
+        return (1.0 + torch.erf(x / math.sqrt(2.0))) / 2.0
 
-    low = norm_cdf((a - mean) / std)
-    high = norm_cdf((b - mean) / std)
+    # Cutoff values in standard normal space
+    low = norm_cdf(torch.tensor((a - mean) / std))
+    high = norm_cdf(torch.tensor((b - mean) / std))
 
-    # Fill tensor with uniform values for truncation
-    tensor.uniform_(2 * low - 1, 2 * high - 1)
+    # Uniform sampling in the [low, high] range
+    uniform = torch.empty_like(tensor).uniform_(low, high)
 
-    # Use the inverse CDF (probit function) to transform to normal distribution
-    tensor.erfinv_()
-
-    # Transform to the desired mean and standard deviation
-    tensor.mul_(std * math.sqrt(2.0)).add_(mean)
+    # Transform to a truncated normal distribution using the inverse CDF (probit function)
+    normal_sample = torch.erfinv(2 * uniform - 1) * (math.sqrt(2.0) * std) + mean
 
     # Clamp to the range [a, b]
-    tensor.clamp_(min=a, max=b)
+    normal_sample = torch.clamp(normal_sample, min=a, max=b)
 
+    # Copy the result into the input tensor
+    tensor.data.copy_(normal_sample)
     return tensor
