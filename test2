@@ -1,27 +1,12 @@
-import torch
-import torch.nn as nn
-from thop import profile
+class SelectiveScanWrapper(nn.Module):
+    def __init__(self, selective_scan_fn):
+        super().__init__()
+        self.selective_scan_fn = selective_scan_fn
 
-# 包装 core 函数为 nn.Module
-class CoreWrapper(nn.Module):
-    def __init__(self, core_func):
-        super(CoreWrapper, self).__init__()
-        self.core_func = core_func
-    
-    def forward(self, x):
-        return self.core_func(x)
-
-# 假设你的 forward core 函数
-def forward_core(x):
-    # 示例：假设 core 函数中有一个矩阵乘法
-    return torch.matmul(x, x)
-
-# 包装 core 函数
-core_module = CoreWrapper(forward_core)
-
-# 测试输入
-x = torch.randn(64, 64)
-
-# 使用 thop 统计 FLOPs
-flops, params = profile(core_module, inputs=(x,))
-print(f"FLOPs: {flops}, Params: {params}")
+    def forward(self, xs, dts, As, Bs, Cs, Ds, z, delta_bias, delta_softplus, return_last_state):
+        return self.selective_scan_fn(
+            xs, dts, As, Bs, Cs, Ds, z=z,
+            delta_bias=delta_bias,
+            delta_softplus=delta_softplus,
+            return_last_state=return_last_state
+        )
