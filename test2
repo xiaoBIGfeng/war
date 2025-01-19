@@ -1,3 +1,7 @@
+import torch
+import torch.nn as nn
+
+# 包装 selective_scan_fn 为 PyTorch 模块
 class SelectiveScanWrapper(nn.Module):
     def __init__(self, selective_scan_fn):
         super().__init__()
