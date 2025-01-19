@@ -14,3 +14,4 @@ class SelectiveScanWrapper(nn.Module):
             delta_softplus=delta_softplus,
             return_last_state=return_last_state
         )
+ self.selective_scan = SelectiveScanWrapper(selective_scan_fn)
