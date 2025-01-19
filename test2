@@ -1,36 +1,27 @@
-import math
 import torch
+import torch.nn as nn
+from thop import profile
 
+# 包装 core 函数为 nn.Module
+class CoreWrapper(nn.Module):
+    def __init__(self, core_func):
+        super(CoreWrapper, self).__init__()
+        self.core_func = core_func
+    
+    def forward(self, x):
+        return self.core_func(x)
 
-def trunc_normal_(tensor, mean=0.0, std=1.0, a=-2.0, b=2.0):
-    """
-    Fills the input tensor with values drawn from a truncated normal distribution.
-    This version avoids in-place operations to support backpropagation.
+# 假设你的 forward core 函数
+def forward_core(x):
+    # 示例：假设 core 函数中有一个矩阵乘法
+    return torch.matmul(x, x)
 
-    Args:
-        tensor (torch.Tensor): The tensor to fill.
-        mean (float): The mean of the normal distribution.
-        std (float): The standard deviation of the normal distribution.
-        a (float): The minimum cutoff value.
-        b (float): The maximum cutoff value.
-    """
-    # Compute the upper and lower bounds in the standard normal space
-    def norm_cdf(x):
-        return (1.0 + torch.erf(x / math.sqrt(2.0))) / 2.0
+# 包装 core 函数
+core_module = CoreWrapper(forward_core)
 
-    # Cutoff values in standard normal space
-    low = norm_cdf(torch.tensor((a - mean) / std))
-    high = norm_cdf(torch.tensor((b - mean) / std))
+# 测试输入
+x = torch.randn(64, 64)
 
-    # Uniform sampling in the [low, high] range
-    uniform = torch.empty_like(tensor).uniform_(low, high)
-
-    # Transform to a truncated normal distribution using the inverse CDF (probit function)
-    normal_sample = torch.erfinv(2 * uniform - 1) * (math.sqrt(2.0) * std) + mean
-
-    # Clamp to the range [a, b]
-    normal_sample = torch.clamp(normal_sample, min=a, max=b)
-
-    # Copy the result into the input tensor
-    tensor.data.copy_(normal_sample)
-    return tensor
+# 使用 thop 统计 FLOPs
+flops, params = profile(core_module, inputs=(x,))
+print(f"FLOPs: {flops}, Params: {params}")
