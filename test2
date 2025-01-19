@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
+from mamba_ssm.ops.selective_scan_interface import selective_scan_fn
 
-# 包装 selective_scan_fn 为 PyTorch 模块
 class SelectiveScanWrapper(nn.Module):
     def __init__(self, selective_scan_fn):
         super().__init__()
@@ -9,9 +9,7 @@ class SelectiveScanWrapper(nn.Module):
 
     def forward(self, xs, dts, As, Bs, Cs, Ds, z, delta_bias, delta_softplus, return_last_state):
         return self.selective_scan_fn(
-            xs, dts, As, Bs, Cs, Ds, z=z,
-            delta_bias=delta_bias,
-            delta_softplus=delta_softplus,
-            return_last_state=return_last_state
+            xs, dts, As, Bs, Cs, Ds, z, delta_bias, delta_softplus, return_last_state
         )
- self.selective_scan = SelectiveScanWrapper(selective_scan_fn)
+        # Wrap selective_scan_fn into a module
+        self.selective_scan = SelectiveScanWrapper(selective_scan_fn)
